@@ -1,0 +1,40 @@
+datasource:
+  username: postgres
+  driver: org.postgresql.Driver
+  jdbcUrl: jdbc:postgresql://fraciconi.controlliamo.com:5432/emblemata
+  password: 8Ts9Er7vNyuL78M7qtoI
+spring:
+  main:
+    keep-alive: true
+  application:
+    name: emblemata
+  datasource:
+    driver-class-name: ${datasource.driver}
+    username: ${datasource.username}
+    url: ${datasource.jdbcUrl}
+    password: ${datasource.password}
+  jpa:
+    hibernate:
+      generate-ddl: true
+      ddl-auto: update
+  kafka:
+    enabled: true
+    security:
+      protocol: PLAINTEXT
+    topic_constituency: emblemata-constituency
+    producer:
+      bootstrap-servers: fraciconi.controlliamo.com:9092
+      acks: ${ACKS:all}
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        retries: 0
+        delivery.timeout.ms: 1000
+        request.timeout.ms: 1000
+        max.in.flight.requests.per.connection: 1
+        transaction-id-prefix: tx-
+
+logging:
+  level:
+    root: WARN
+    it.gov.acn: DEBUG
