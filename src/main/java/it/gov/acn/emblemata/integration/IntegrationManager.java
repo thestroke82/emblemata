@@ -1,7 +1,6 @@
 package it.gov.acn.emblemata.integration;
 
-import it.gov.acn.emblemata.integration.kafka.KafkaConfig;
-import lombok.RequiredArgsConstructor;
+import it.gov.acn.emblemata.config.KafkaConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 

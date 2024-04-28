@@ -1,8 +1,8 @@
 datasource:
-  username: postgres
   driver: org.postgresql.Driver
-  jdbcUrl: jdbc:postgresql://fraciconi.controlliamo.com:5432/emblemata
-  password: 8Ts9Er7vNyuL78M7qtoI
+  jdbcUrl: ${POSTGRES_URL}
+  username: ${POSTGRES_USERNAME}
+  password: ${POSTGRES_PASSWORD}
 spring:
   main:
     keep-alive: true
@@ -21,20 +21,32 @@ spring:
     enabled: true
     security:
       protocol: PLAINTEXT
-    topic_constituency: emblemata-constituency
     producer:
-      bootstrap-servers: fraciconi.controlliamo.com:9092
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_BROKER}
       acks: ${ACKS:all}
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
+#      transaction-id-prefix: kproducer-${random.int(1000)}-tx-
       properties:
         retries: 0
+        enable.idempotence: false
         delivery.timeout.ms: 1000
         request.timeout.ms: 1000
         max.in.flight.requests.per.connection: 1
+
+    # application specific kafka related configuration
+    topic-constituency: emblemata-constituency
+    initial-attempt: true   # if true a first best effort attempt is made to send the message to kafka after storing it in the outbox
+    outbox:
+      scheduler:
+        enabled: true
+        # tipically if 'initial-attempt' is true, the delay should be large-ish, otherwise the delay should be smaller
+        delayms: '#{60*1000}' #60 seconds
+
 
 logging:
   level:
     root: WARN
     it.gov.acn: DEBUG
-    org.apache.kafka.clients.producer: DEBUG
+    #org.apache.kafka: DEBUG
+    #org.hibernate.engine.transaction.internal.TransactionImpl: TRACE

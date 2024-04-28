@@ -1,10 +1,11 @@
 package it.gov.acn.emblemata.integration.kafka;
 
+import it.gov.acn.emblemata.config.KafkaConfig;
 import it.gov.acn.emblemata.integration.IntegrationManager;
+import it.gov.acn.emblemata.model.event.BaseEvent;
 import it.gov.acn.emblemata.model.event.ConstituencyCreatedEvent;
 import java.util.concurrent.CompletableFuture;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,15 +24,15 @@ public class KafkaClient {
   private IntegrationManager integrationManager;
 
   @Autowired
-  private KafkaTemplate<String, ConstituencyCreatedEvent> constituencyEventKafkaTemplate;
+  private KafkaTemplate<String, BaseEvent<?>> kafkaTemplate;
 
 
-  public CompletableFuture<SendResult<String, ConstituencyCreatedEvent>> sendConstituencyEvent(ConstituencyCreatedEvent event){
+  public CompletableFuture<SendResult<String, BaseEvent<?>>> send(BaseEvent<?> event){
     if(!this.integrationManager.isKafkaEnabled()){
-      this.gracefullyFallBack("sendConstituencyEvent");
+      this.gracefullyFallBack(" Send event to Kafka ");
       return null;
     }
-    return this.constituencyEventKafkaTemplate.send(this.config.getTopicConstituency(), event.getEventId(), event);
+    return this.kafkaTemplate.send(this.config.getTopicConstituency(), event.getEventId(), event);
   }
 
 

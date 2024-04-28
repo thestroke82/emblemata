@@ -21,7 +21,7 @@ public class KafkaOutboxService {
 
   private final KafkaOutboxRepository eventOutboxRepository;
 
-  public KafkaOutbox  registerEvent(BaseEvent<?> event) {
+  public KafkaOutbox saveOutbox(BaseEvent<?> event) {
     String eventJson = Commons.gson.toJson(event);
     String eventType = event.getClass().getName();
     logger.info("Registering event "+eventType+": {}", eventJson);
@@ -55,7 +55,7 @@ public class KafkaOutboxService {
     Instant now = Instant.now();
     savedOutbox.get().setLastAttemptDate(now);
     savedOutbox.get().setTotalAttempts(savedOutbox.get().getTotalAttempts() + 1);
-    savedOutbox.get().setError(errorMessage);
+    savedOutbox.get().setLastError(errorMessage);
     this.eventOutboxRepository.save(savedOutbox.get());
   }
 }

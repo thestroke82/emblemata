@@ -35,6 +35,6 @@ public class KafkaOutbox {
   private String event;
 
   @Column(columnDefinition = "text")
-  private String error;
+  private String lastError;
 
 }

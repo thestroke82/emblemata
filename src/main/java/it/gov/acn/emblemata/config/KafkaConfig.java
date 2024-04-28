@@ -1,4 +1,4 @@
-package it.gov.acn.emblemata.integration.kafka;
+package it.gov.acn.emblemata.config;
 
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 @ConditionalOnProperty( name = "spring.kafka.enabled", havingValue = "true" )
 public class KafkaConfig {
-  @Value("${spring.kafka.topic_constituency}")
+  @Value("${spring.kafka.topic-constituency}")
   private String topicConstituency;
+  @Value("${spring.kafka.initial-attempt}")
+  private boolean initialAttempt;
 }
