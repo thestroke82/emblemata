@@ -26,7 +26,7 @@ spring:
       acks: ${ACKS:all}
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-#      transaction-id-prefix: kproducer-${random.int(1000)}-tx-
+      #      transaction-id-prefix: kproducer-${random.int(1000)}-tx-
       properties:
         retries: 0
         enable.idempotence: false
@@ -37,11 +37,11 @@ spring:
     # application specific kafka related configuration
     topic-constituency: emblemata-constituency
     initial-attempt: true   # if true a first best effort attempt is made to send the message to kafka after storing it in the outbox
-    outbox:
-      scheduler:
-        enabled: true
-        # tipically if 'initial-attempt' is true, the delay should be large-ish, otherwise the delay should be smaller
-        delayms: '#{60*1000}' #60 seconds
+  outbox:
+    scheduler:
+      enabled: true
+      # tipically if 'initial-attempt' is true, the delay should be large-ish, otherwise the delay should be smaller
+      delayms: '#{60*1000}' #60 seconds
 
 
 logging:

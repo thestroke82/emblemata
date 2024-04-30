@@ -1,6 +1,6 @@
 package it.gov.acn.emblemata.listener;
 
-import it.gov.acn.emblemata.config.KafkaConfig;
+import it.gov.acn.emblemata.config.KafkaConfiguration;
 import it.gov.acn.emblemata.integration.IntegrationManager;
 import it.gov.acn.emblemata.integration.kafka.KafkaOutboxProcessor;
 import it.gov.acn.emblemata.model.KafkaOutbox;
@@ -16,7 +16,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class KafkaApplicationEventListener {
   private final KafkaOutboxService kafkaOutboxService;
   private final KafkaOutboxProcessor kafkaOutboxHandler;
-  private final KafkaConfig kafkaConfig;
+  private final KafkaConfiguration kafkaConfig;
   private final IntegrationManager integrationManager;
 
   @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)

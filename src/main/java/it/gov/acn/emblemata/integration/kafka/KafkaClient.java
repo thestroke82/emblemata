@@ -1,9 +1,8 @@
 package it.gov.acn.emblemata.integration.kafka;
 
-import it.gov.acn.emblemata.config.KafkaConfig;
+import it.gov.acn.emblemata.config.KafkaConfiguration;
 import it.gov.acn.emblemata.integration.IntegrationManager;
 import it.gov.acn.emblemata.model.event.BaseEvent;
-import it.gov.acn.emblemata.model.event.ConstituencyCreatedEvent;
 import java.util.concurrent.CompletableFuture;
 import lombok.NoArgsConstructor;
 import org.slf4j.Logger;
@@ -18,7 +17,7 @@ import org.springframework.stereotype.Component;
 public class KafkaClient {
   private final Logger logger = LoggerFactory.getLogger(KafkaClient.class);
   @Autowired(required = false)
-  private KafkaConfig config;
+  private KafkaConfiguration config;
 
   @Autowired
   private IntegrationManager integrationManager;

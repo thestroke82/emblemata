@@ -5,6 +5,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Version;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,7 +26,9 @@ public class Constituency {
   private UUID id;
   private String name;
   private String address;
-  // private Instant creationDate;
+  private Instant foundationDate;
+
+
 
   @Version
   private long version;
