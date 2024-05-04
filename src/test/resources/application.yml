@@ -21,6 +21,8 @@ spring:
     enabled: true
     security:
       protocol: PLAINTEXT
+    admin:
+      fail-fast: true
     producer:
       bootstrap-servers: ${KAFKA_BOOTSTRAP_BROKER}
       acks: ${ACKS:all}

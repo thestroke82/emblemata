@@ -1,55 +1,50 @@
-package it.gov.acn.emblemata.scheduling;
-
+package it.gov.acn.emblemata.scheduling.domain.service;
 
 import it.gov.acn.emblemata.config.KafkaOutboxSchedulerConfiguration;
-import it.gov.acn.emblemata.integration.kafka.KafkaOutboxProcessor;
 import it.gov.acn.emblemata.model.KafkaOutbox;
-import it.gov.acn.emblemata.repository.KafkaOutboxRepositoryPaged;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.concurrent.ScheduledFuture;
+import it.gov.acn.emblemata.scheduling.adapter.in.KafkaOutboxScheduler;
+import it.gov.acn.emblemata.scheduling.domain.model.FindKafkaOutboxItemsQuery;
+import it.gov.acn.emblemata.scheduling.domain.port.in.ProcessKafkaOutboxUseCase;
+import it.gov.acn.emblemata.scheduling.domain.port.out.DoTheKafkaOutboxJobPort;
+import it.gov.acn.emblemata.scheduling.domain.port.out.FindKafkaOutboxItemsPort;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Bean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
+
 @Component
 @RequiredArgsConstructor
-public class KafkaOutboxScheduler {
+public class ProcessKafkaOutboxService implements ProcessKafkaOutboxUseCase {
     private final Logger logger = LoggerFactory.getLogger(KafkaOutboxScheduler.class);
 
     private final KafkaOutboxSchedulerConfiguration configuration;
-    private final KafkaOutboxRepositoryPaged kafkaOutboxRepositoryPaged;
-    private final KafkaOutboxProcessor kafkaOutboxProcessor;
-
-    @Bean
-    public ScheduledFuture<?> myScheduledTask(TaskScheduler scheduler) {
-        if(!this.configuration.isEnabled()){
-            return null;
-        }
-        Runnable task = this::processKafkaOutbox;
-        Duration delay = Duration.ofMillis(configuration.getDelayMs());
-        return scheduler.scheduleWithFixedDelay(task, delay);
-    }
+    private final FindKafkaOutboxItemsPort findOutstandingOutboxItemsPort;
+    private final DoTheKafkaOutboxJobPort doTheKafkaOutboxJobPort;
 
 
     @Transactional
+    @Override
     public void processKafkaOutbox() {
         Instant retentionStart = Instant.now().minus(Duration.ofDays(this.configuration.getRetentionDays()));
         Pageable pageable = PageRequest.of(0, this.configuration.getBatchSize(), Sort.by("publishDate").ascending());
-        Page<KafkaOutbox> batch = this.kafkaOutboxRepositoryPaged.findOutstandingEvents(retentionStart,  null, pageable);
+        FindKafkaOutboxItemsQuery query = FindKafkaOutboxItemsQuery.builder()
+                .publishDateAfter(retentionStart)
+                .pageable(pageable)
+                .build();
+        Page<KafkaOutbox> batch = this.findOutstandingOutboxItemsPort.findOutstandingOutboxItems(query);
+
         if(batch.isEmpty()){
             logger.info("No events to process");
             return;
         }
-        batch.getContent().forEach(this.kafkaOutboxProcessor::processOutbox);
+        batch.getContent().forEach(this.doTheKafkaOutboxJobPort::doTheJob);
     }
-
 }
