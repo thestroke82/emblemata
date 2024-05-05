@@ -4,16 +4,19 @@ package it.gov.acn.emblemata.scheduling;
 import it.gov.acn.emblemata.config.KafkaOutboxSchedulerConfiguration;
 import it.gov.acn.emblemata.integration.kafka.KafkaOutboxProcessor;
 import it.gov.acn.emblemata.model.KafkaOutbox;
-import it.gov.acn.emblemata.repository.KafkaOutboxRepositoryPaged;
+
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.ScheduledFuture;
+import java.util.stream.Collectors;
+
+import it.gov.acn.emblemata.repository.KafkaOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.TaskScheduler;
@@ -26,7 +29,7 @@ public class KafkaOutboxScheduler {
     private final Logger logger = LoggerFactory.getLogger(KafkaOutboxScheduler.class);
 
     private final KafkaOutboxSchedulerConfiguration configuration;
-    private final KafkaOutboxRepositoryPaged kafkaOutboxRepositoryPaged;
+    private final KafkaOutboxRepository kafkaOutboxRepository;
     private final KafkaOutboxProcessor kafkaOutboxProcessor;
 
     @Bean
@@ -42,14 +45,33 @@ public class KafkaOutboxScheduler {
 
     @Transactional
     public void processKafkaOutbox() {
-        Instant retentionStart = Instant.now().minus(Duration.ofDays(this.configuration.getRetentionDays()));
-        Pageable pageable = PageRequest.of(0, this.configuration.getBatchSize(), Sort.by("publishDate").ascending());
-        Page<KafkaOutbox> batch = this.kafkaOutboxRepositoryPaged.findOutstandingEvents(retentionStart,  null, pageable);
-        if(batch.isEmpty()){
-            logger.info("No events to process");
+
+        // oldest publications first
+        Sort sort = Sort.by("publishDate").ascending();
+
+
+        int maxAttempts  = this.configuration.getMaxAttempts()+1; // we have to
+        List<KafkaOutbox> outstandingEvents = this.kafkaOutboxRepository.findOutstandingEvents(maxAttempts, sort );
+        Instant now = Instant.now();
+
+        outstandingEvents = outstandingEvents.stream().filter(oe->{
+            if(oe.getTotalAttempts()==0 ||  oe.getLastAttemptDate()==null){
+                return true;
+            }
+
+            // Filtering out events that have not yet completed the exponential backoff period
+            Instant backoffProjection = oe.getLastAttemptDate()
+                    .plus(Duration.ofMinutes((long) Math.pow(this.configuration.getBackoffBase(), oe.getTotalAttempts())));
+            return backoffProjection.isBefore(now);
+        }).collect(Collectors.toList());
+
+        if(outstandingEvents.isEmpty()){
+            logger.debug("No Kafka outbox items to process. See you later!");
             return;
         }
-        batch.getContent().forEach(this.kafkaOutboxProcessor::processOutbox);
+
+        logger.debug("Kafka outbox scheduler processing {} items", outstandingEvents.size());
+        outstandingEvents.forEach(this.kafkaOutboxProcessor::processOutbox);
     }
 
 }

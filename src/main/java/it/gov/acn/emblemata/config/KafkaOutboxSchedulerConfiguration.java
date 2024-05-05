@@ -12,8 +12,8 @@ public class KafkaOutboxSchedulerConfiguration {
   private boolean enabled;
   @Value("${spring.kafka.outbox.scheduler.delayms:20000}")
   private long delayMs;
-  @Value("${spring.kafka.outbox.scheduler.batch-size:20}")
-  private int batchSize;
-  @Value("${spring.kafka.outbox.scheduler.retention-days:7}")
-  private int retentionDays;
+  @Value("${spring.kafka.outbox.scheduler.max-attempts:3}")
+  private int maxAttempts;
+  @Value("${spring.kafka.outbox.scheduler.backoff-base:5}")
+  private int backoffBase;
 }

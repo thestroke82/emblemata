@@ -2,7 +2,6 @@ package it.gov.acn.emblemata;
 
 import it.gov.acn.emblemata.config.KafkaOutboxSchedulerConfiguration;
 import it.gov.acn.emblemata.model.KafkaOutbox;
-import it.gov.acn.emblemata.repository.KafkaOutboxRepositoryPaged;
 import it.gov.acn.emblemata.service.ConstituencyService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -33,8 +32,6 @@ public class KafkaOutboxSchedulerTests {
   @Autowired
   private KafkaOutboxSchedulerConfiguration kafkaOutboxSchedulerConfiguration;
 
-  @Autowired
-  private KafkaOutboxRepositoryPaged kafkaOutboxRepositoryPaged;
 
   @Autowired
   private ConstituencyService constituencyService;

@@ -6,12 +6,10 @@ import it.gov.acn.emblemata.model.KafkaOutbox;
 import it.gov.acn.emblemata.model.event.ConstituencyCreatedEvent;
 import it.gov.acn.emblemata.repository.ConstituencyRepository;
 import it.gov.acn.emblemata.repository.KafkaOutboxRepository;
-import it.gov.acn.emblemata.repository.KafkaOutboxRepositoryPaged;
 import it.gov.acn.emblemata.service.ConstituencyService;
 import it.gov.acn.emblemata.service.KafkaOutboxService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
-import java.time.Instant;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -28,6 +26,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
+import java.time.Instant;
+import java.util.List;
+
 
 @SpringBootTest
 @ExtendWith(MockitoExtension.class)
@@ -40,9 +41,6 @@ class EmblemataApplicationTests {
 
 	@SpyBean
 	private KafkaOutboxRepository kafkaOutboxRepository;
-
-	@SpyBean
-	private KafkaOutboxRepositoryPaged kafkaOutboxRepositoryPaged;
 
 	@Autowired
 	private EntityManagerFactory entityManagerFactory;
@@ -107,17 +105,9 @@ class EmblemataApplicationTests {
 //				Pair.of("logging.level.org.hibernate.type.descriptor.sql", Level.TRACE)
 //		));
 
-		Page<KafkaOutbox> result = this.kafkaOutboxRepositoryPaged.findOutstandingEvents(null,  null, null);
-		Assertions.assertEquals(10, result.getTotalElements());
-		Assertions.assertEquals(10, result.getSize());
-		Assertions.assertEquals(10, result.getNumberOfElements());
+		List<KafkaOutbox> result = this.kafkaOutboxRepository.findOutstandingEvents(null,  null, null);
+		Assertions.assertEquals(10, result.size());
 
-		Pageable pageable = PageRequest.of(0, 3, Sort.by("publishDate").descending());
-		result = this.kafkaOutboxRepositoryPaged.findOutstandingEvents(null,   null, pageable);
-		Assertions.assertEquals(10, result.getTotalElements());
-		Assertions.assertEquals(3, result.getSize());
-		Assertions.assertEquals(3, result.getNumberOfElements());
-		Assertions.assertEquals(4, result.getTotalPages());
 
 	}
 
