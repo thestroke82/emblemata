@@ -17,10 +17,16 @@ spring:
     hibernate:
       generate-ddl: true
       ddl-auto: update
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: '0'
+
   kafka:
     enabled: true
     security:
       protocol: PLAINTEXT
+    admin:
+      fail-fast: true
     producer:
       bootstrap-servers: ${KAFKA_BOOTSTRAP_BROKER}
       acks: ${ACKS:all}
@@ -37,16 +43,26 @@ spring:
     # application specific kafka related configuration
     topic-constituency: emblemata-constituency
     initial-attempt: true   # if true a first best effort attempt is made to send the message to kafka after storing it in the outbox
-  outbox:
-    scheduler:
-      enabled: true
-      # tipically if 'initial-attempt' is true, the delay should be large-ish, otherwise the delay should be smaller
-      delayms: '#{60*1000}' #60 seconds
+
+    # the outbox pattern is used to store messages in the database before sending them to kafka
+    outbox:
+      scheduler:
+        enabled: true
+        delayms: '#{60*1000}' #60 seconds # the interval at which the scheduler runs, expressed in milliseconds
+        max-attempts: 3 # count of retry attempts for sending a message to kafka, not including the first best effort attempt
+        backoff-base: 5 # base in minutes for the exponential backoff. Example: if backoff base is 5, the 1st retry attempt
+        # will be made after 5 minutes, the 2nd after 25 minutes, the 3rd after 125 minutes, etc.
+        statistics:
+          log: true
+          log-level: INFO
+          log-interval-minutes: 60 # print statistics every 60 minutes
+
 
 
 logging:
   level:
     root: WARN
     it.gov.acn: DEBUG
+    #org.springframework.kafka.core.KafkaTemplate: TRACE
     #org.apache.kafka: DEBUG
     #org.hibernate.engine.transaction.internal.TransactionImpl: TRACE

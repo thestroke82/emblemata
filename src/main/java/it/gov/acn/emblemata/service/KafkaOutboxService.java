@@ -24,7 +24,7 @@ public class KafkaOutboxService {
   public KafkaOutbox saveOutbox(BaseEvent<?> event) {
     String eventJson = Commons.gson.toJson(event);
     String eventType = event.getClass().getName();
-    logger.info("Registering event "+eventType+": {}", eventJson);
+    logger.trace("Registering event "+eventType+": {}", eventJson);
     KafkaOutbox eventOutbox = KafkaOutbox.builder()
         .eventClass(eventType)
         .event(eventJson)
@@ -33,29 +33,29 @@ public class KafkaOutboxService {
     return this.eventOutboxRepository.save(eventOutbox);
   }
 
-  public void succesfulAttempt(UUID kafkaOutboxId) {
+  public Optional<KafkaOutbox> succesfulAttempt(UUID kafkaOutboxId) {
     Optional<KafkaOutbox> savedOutbox = this.eventOutboxRepository.findById(kafkaOutboxId);
     if(savedOutbox.isEmpty()) {
       logger.error("Outbox with id {} not found", kafkaOutboxId);
-      return;
+      return savedOutbox;
     }
     Instant now = Instant.now();
     savedOutbox.get().setLastAttemptDate(now);
     savedOutbox.get().setTotalAttempts(savedOutbox.get().getTotalAttempts() + 1);
     savedOutbox.get().setCompletionDate(now);
-    this.eventOutboxRepository.save(savedOutbox.get());
+    return Optional.of(this.eventOutboxRepository.save(savedOutbox.get()));
   }
 
-  public void unsuccesfulAttempt(UUID kafkaOutboxId, String errorMessage) {
+  public Optional<KafkaOutbox> unsuccesfulAttempt(UUID kafkaOutboxId, String errorMessage) {
     Optional<KafkaOutbox> savedOutbox = this.eventOutboxRepository.findById(kafkaOutboxId);
     if(savedOutbox.isEmpty()) {
       logger.error("Outbox with id {} not found", kafkaOutboxId);
-      return;
+      return savedOutbox;
     }
     Instant now = Instant.now();
     savedOutbox.get().setLastAttemptDate(now);
     savedOutbox.get().setTotalAttempts(savedOutbox.get().getTotalAttempts() + 1);
     savedOutbox.get().setLastError(errorMessage);
-    this.eventOutboxRepository.save(savedOutbox.get());
+    return Optional.of(this.eventOutboxRepository.save(savedOutbox.get()));
   }
 }

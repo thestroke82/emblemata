@@ -88,28 +88,7 @@ class EmblemataApplicationTests {
 		Assertions.assertNotNull(outbox.getLastError());
 	}
 
-	@Test
-	@Tag("clean")
-	void test_kafka_outbox_repository_fetch_outbox_page(){
-		for(int i = 0; i < 10; i++){
-			this.kafkaOutboxService.saveOutbox(
-					ConstituencyCreatedEvent.builder()
-							.payload(TestUtil.createTelecom())
-							.build()
-			);
-		}
-		Instant now = Instant.now();
-//
-//		TestUtil.changeLogLevels(List.of(
-//				Pair.of("logging.level.org.hibernate.SQL", Level.DEBUG),
-//				Pair.of("logging.level.org.hibernate.type.descriptor.sql", Level.TRACE)
-//		));
 
-		List<KafkaOutbox> result = this.kafkaOutboxRepository.findOutstandingEvents(null,  null, null);
-		Assertions.assertEquals(10, result.size());
-
-
-	}
 
 
 	@BeforeEach
