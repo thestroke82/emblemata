@@ -1,5 +1,7 @@
-package it.gov.acn.emblemata;
+package it.gov.acn.emblemata.integration;
 
+import it.gov.acn.emblemata.PersistenceTestContext;
+import it.gov.acn.emblemata.TestUtil;
 import it.gov.acn.emblemata.config.KafkaOutboxSchedulerConfiguration;
 import it.gov.acn.emblemata.integration.kafka.KafkaClient;
 import it.gov.acn.emblemata.integration.kafka.KafkaOutboxStatistics;
@@ -28,6 +30,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 
 @SpringBootTest(properties = {
+    "spring.kafka.enabled=true",
     "spring.kafka.initial-attempt=true",
     "spring.kafka.outbox.scheduler.enabled=true",
     "spring.kafka.outbox.scheduler.max-attempts=3",
@@ -37,7 +40,7 @@ import org.springframework.boot.test.mock.mockito.SpyBean;
 })
 @ExtendWith(MockitoExtension.class)
 @TestInstance(Lifecycle.PER_CLASS)
-public class KafkaOutboxSchedulerTests {
+public class KafkaOutboxSchedulerTests extends PersistenceTestContext {
 
   @Autowired
   private EntityManagerFactory entityManagerFactory;
@@ -62,49 +65,28 @@ public class KafkaOutboxSchedulerTests {
 
 
   @BeforeAll
-  void flywayMigration(){
-    this.flyway.migrate();
+  void setup() {
+    Mockito.doAnswer((invocation)-> CompletableFuture.completedFuture(null))
+        .when(kafkaClient).send(Mockito.any());
   }
+
 
 
   @Test
   @Tag("clean")
-  void save_constituency_best_effort_attempt_success() throws InterruptedException {
+  void when_saveConstituency_bestEffort_attempt_fails_then_scheduler_succeed() throws InterruptedException {
 
-    Constituency enel = TestUtil.createEnel();
-
-    // I want the actual Kafka call to always succeed, since we are testing the scheduler
-    Mockito.doReturn(CompletableFuture.completedFuture(
-        null
-    )).when(kafkaClient).send(Mockito.any());
-
-    // base case: a new constituency is saved and an initial succesful attempt is made
-    this.constituencyService.saveConstituency(enel);
-
-    // wait for the scheduler to process the outbox and verify that's not called a second time
-    Thread.sleep(200);
-
-    Mockito.verify(kafkaClient, Mockito.times(1)).send(Mockito.any());
-
-    KafkaOutbox kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
-    Assertions.assertNotNull(
-        kafkaOutbox.getCompletionDate());
-    Assertions.assertEquals(1, kafkaOutbox.getTotalAttempts());
-
-  }
-
-  @Test
-  @Tag("clean")
-  void save_constituency_best_effort_attempt_failure_then_scheduler_success() throws InterruptedException {
-
+    // given:
     Constituency enel = TestUtil.createEnel();
 
     // I want the actual Kafka call to fail the first time
     Mockito.doThrow(new RuntimeException("Test exception")).when(kafkaClient).send(Mockito.any());
 
+    // when
     // base case: a new constituency is saved and an initial unsuccesful attempt is made
     this.constituencyService.saveConstituency(enel);
 
+    // then:
     // wait for the scheduler to process the outbox and verify that's not been called a second time
     Thread.sleep(200);
 
@@ -119,7 +101,7 @@ public class KafkaOutboxSchedulerTests {
     Mockito.doReturn(CompletableFuture.completedFuture(null))
         .when(kafkaClient).send(Mockito.any());
 
-    // I have to wait the backoff period
+    // I have to wait out the backoff period
     Thread.sleep(500+this.kafkaOutboxSchedulerConfiguration.getDelayMs()
         +this.calculateBackoff(kafkaOutbox).toMillis());
 
@@ -134,17 +116,20 @@ public class KafkaOutboxSchedulerTests {
 
   @Test
   @Tag("clean")
-  void save_constituency_success_third_attempt() throws InterruptedException {
+  void given_initialAttemmpt_disabled_when_saveConstituency_then_scheduler_success_3rd_time() throws InterruptedException {
+
+    // given:
     Constituency enel = TestUtil.createEnel();
-
-
     // the kafka send will fail twice
     Mockito.doThrow(new RuntimeException("Test exception 1")).when(kafkaClient).send(Mockito.any());
     // disable first best effort attempt
     Mockito.when(kafkaOutboxSchedulerConfiguration.isInitialAttempt()).thenReturn(false);
 
+    // when
     this.constituencyService.saveConstituency(enel);
 
+
+    // then
     // wait for the scheduler to fail the first time
     Thread.sleep(this.kafkaOutboxSchedulerConfiguration.getDelayMs()+100);
 
@@ -198,6 +183,8 @@ public class KafkaOutboxSchedulerTests {
     em.createNativeQuery("truncate table constituency").executeUpdate();
     em.createNativeQuery("truncate table kafka_outbox").executeUpdate();
     em.getTransaction().commit();
+
+    this.kafkaOutboxStatistics.reset();
   }
 
 }

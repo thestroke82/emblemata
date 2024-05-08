@@ -22,7 +22,7 @@ spring:
     baseline-version: '0'
 
   kafka:
-    enabled: true
+    enabled: false
     security:
       protocol: PLAINTEXT
     admin:
@@ -47,7 +47,7 @@ spring:
     # the outbox pattern is used to store messages in the database before sending them to kafka
     outbox:
       scheduler:
-        enabled: true
+        enabled: false
         delayms: '#{60*1000}' #60 seconds # the interval at which the scheduler runs, expressed in milliseconds
         max-attempts: 3 # count of retry attempts for sending a message to kafka, not including the first best effort attempt
         backoff-base: 5 # base in minutes for the exponential backoff. Example: if backoff base is 5, the 1st retry attempt

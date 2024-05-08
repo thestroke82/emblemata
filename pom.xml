@@ -84,6 +84,16 @@
 			<artifactId>shedlock-provider-jdbc-template</artifactId>
 			<version>5.10.0</version>
 		</dependency>
+		<dependency>
+			<artifactId>postgresql</artifactId>
+			<groupId>org.testcontainers</groupId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<artifactId>junit-jupiter</artifactId>
+			<groupId>org.testcontainers</groupId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>

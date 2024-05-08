@@ -9,6 +9,7 @@ import it.gov.acn.emblemata.model.KafkaOutbox;
 import it.gov.acn.emblemata.model.event.BaseEvent;
 import it.gov.acn.emblemata.service.KafkaOutboxService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -18,10 +19,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class KafkaApplicationEventListener {
   private final KafkaOutboxService kafkaOutboxService;
   private final KafkaOutboxProcessor kafkaOutboxHandler;
-  private final KafkaConfiguration kafkaConfig;
   private final KafkaOutboxLockManager kafkaOutboxLockManager;
   private final IntegrationManager integrationManager;
   private final KafkaOutboxStatistics kafkaOutboxStatistics;
+
+  @Autowired(required = false)
+  private KafkaConfiguration kafkaConfig;
+
 
   @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void on(BaseEvent<?> event){
