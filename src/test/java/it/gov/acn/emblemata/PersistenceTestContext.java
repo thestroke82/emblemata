@@ -31,7 +31,10 @@ public class PersistenceTestContext {
 	
 	@DynamicPropertySource
 	static void pgProperties(DynamicPropertyRegistry registry) {
-		registry.add("spring.datasource.url", postgres::getJdbcUrl);
+		String jdbcUrlPart = postgres.getJdbcUrl();
+		String jdbcUrlFull = jdbcUrlPart + "&TC_DAEMON=true";
+
+		registry.add("spring.datasource.url", ()->jdbcUrlFull);
 		registry.add("spring.datasource.driver-class-name", org.postgresql.Driver.class::getName);
 		registry.add("spring.datasource.username", postgres::getUsername);
 		registry.add("spring.datasource.password", postgres::getPassword);

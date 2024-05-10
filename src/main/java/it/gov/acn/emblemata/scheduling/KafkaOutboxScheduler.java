@@ -31,7 +31,7 @@ public class KafkaOutboxScheduler {
     private final KafkaOutboxStatistics kafkaOutboxStatistics;
 
     @Transactional
-    @Scheduled(fixedDelayString = "${spring.kafka.outbox.scheduler.delayms}")
+    @Scheduled(fixedDelayString = "${spring.kafka.outbox.scheduler.delayms}", initialDelayString = "${spring.kafka.outbox.scheduler.delayms}")
     @SchedulerLock(name = "kafkaOutbox")
     public void processKafkaOutbox() {
 

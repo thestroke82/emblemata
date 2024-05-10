@@ -33,7 +33,11 @@ public class KafkaApplicationEventListener {
     this.kafkaOutboxStatistics.incrementQueued();
     if(this.integrationManager.isKafkaEnabled() && this.kafkaConfig.isInitialAttempt()){
       // best effort initial attempt. See configuration "initial-attempt"
+      // if lock already acquired, skip processing
       var lock = this.kafkaOutboxLockManager.lock();
+      if(lock.isEmpty()){
+        return;
+      }
       this.kafkaOutboxHandler.processOutbox(outbox);
       this.kafkaOutboxLockManager.release(lock.orElse(null));
     }
