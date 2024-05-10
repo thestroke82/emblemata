@@ -165,6 +165,12 @@ public class ConcurrentOutboxProcessingTest extends PersistenceTestContext{
       return new ArrayList<>();
     }).when(kafkaOutboxRepository).findOutstandingEvents(Mockito.anyInt(), Mockito.any());
 
+    Mockito.doAnswer(invocation -> {
+      criticalSectionEntrances.getAndIncrement();
+      Thread.sleep(workMs);
+      return null;
+    }).when(kafkaOutboxProcessor).processOutbox(Mockito.any());
+
     // here we arbitrarily invoke 2 scheduler  in parallel
     CompletableFuture<String> cf1 = CompletableFuture.supplyAsync(() -> {
       kafkaApplicationEventListener.on(event1);
