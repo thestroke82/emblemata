@@ -34,28 +34,30 @@ public class KafkaOutboxService {
   }
 
   public Optional<KafkaOutbox> succesfulAttempt(UUID kafkaOutboxId) {
-    Optional<KafkaOutbox> savedOutbox = this.eventOutboxRepository.findById(kafkaOutboxId);
-    if(savedOutbox.isEmpty()) {
+    Optional<KafkaOutbox> savedOutboxOptional = this.eventOutboxRepository.findById(kafkaOutboxId);
+    if(savedOutboxOptional.isEmpty()) {
       logger.error("Outbox with id {} not found", kafkaOutboxId);
-      return savedOutbox;
+      return savedOutboxOptional;
     }
+    KafkaOutbox savedOutbox = savedOutboxOptional.get();
     Instant now = Instant.now();
-    savedOutbox.get().setLastAttemptDate(now);
-    savedOutbox.get().setTotalAttempts(savedOutbox.get().getTotalAttempts() + 1);
-    savedOutbox.get().setCompletionDate(now);
-    return Optional.of(this.eventOutboxRepository.save(savedOutbox.get()));
+    savedOutbox.setLastAttemptDate(now);
+    savedOutbox.setTotalAttempts(savedOutbox.getTotalAttempts() + 1);
+    savedOutbox.setCompletionDate(now);
+    return Optional.of(this.eventOutboxRepository.save(savedOutbox));
   }
 
   public Optional<KafkaOutbox> unsuccesfulAttempt(UUID kafkaOutboxId, String errorMessage) {
-    Optional<KafkaOutbox> savedOutbox = this.eventOutboxRepository.findById(kafkaOutboxId);
-    if(savedOutbox.isEmpty()) {
+    Optional<KafkaOutbox> savedOutboxOptional = this.eventOutboxRepository.findById(kafkaOutboxId);
+    if(savedOutboxOptional.isEmpty()) {
       logger.error("Outbox with id {} not found", kafkaOutboxId);
-      return savedOutbox;
+      return savedOutboxOptional;
     }
+    KafkaOutbox savedOutbox = savedOutboxOptional.get();
     Instant now = Instant.now();
-    savedOutbox.get().setLastAttemptDate(now);
-    savedOutbox.get().setTotalAttempts(savedOutbox.get().getTotalAttempts() + 1);
-    savedOutbox.get().setLastError(errorMessage);
-    return Optional.of(this.eventOutboxRepository.save(savedOutbox.get()));
+    savedOutbox.setLastAttemptDate(now);
+    savedOutbox.setTotalAttempts(savedOutbox.getTotalAttempts() + 1);
+    savedOutbox.setLastError(errorMessage);
+    return Optional.of(this.eventOutboxRepository.save(savedOutbox));
   }
 }

@@ -1,4 +1,4 @@
-package it.gov.acn.emblemata.unit;
+package it.gov.acn.emblemata.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

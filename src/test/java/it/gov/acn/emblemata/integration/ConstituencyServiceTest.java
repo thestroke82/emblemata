@@ -5,6 +5,7 @@ import it.gov.acn.emblemata.PersistenceTestContext;
 import it.gov.acn.emblemata.TestUtil;
 import it.gov.acn.emblemata.config.KafkaConfiguration;
 import it.gov.acn.emblemata.integration.kafka.KafkaClient;
+import it.gov.acn.emblemata.locking.KafkaOutboxLockManager;
 import it.gov.acn.emblemata.model.KafkaOutbox;
 import it.gov.acn.emblemata.repository.ConstituencyRepository;
 import it.gov.acn.emblemata.repository.KafkaOutboxRepository;
@@ -16,6 +17,7 @@ import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
@@ -34,36 +36,24 @@ import org.springframework.boot.test.mock.mockito.SpyBean;
 		properties = {
 				"spring.kafka.enabled=true",
 				"spring.kafka.initial-attempt=true",
-				"spring.kafka.outbox.scheduler.enabled=true",
-				"spring.kafka.outbox.scheduler.max-attempts=3",
-				"spring.kafka.outbox.scheduler.delay-ms=5000",
-				"spring.kafka.outbox.scheduler.backoff-base=2",
-				"spring.kafka.outbox.statistics.log-interval-minutes=1"
+				"spring.kafka.outbox.scheduler.enabled=false"
 		}
 )
 @ExtendWith(MockitoExtension.class)
-@TestInstance(Lifecycle.PER_CLASS)
 class ConstituencyServiceTest extends PersistenceTestContext {
 	@Autowired
 	private ConstituencyService service;
 	@Autowired
 	private EntityManagerFactory entityManagerFactory;
+	@Autowired
+	private KafkaOutboxLockManager kafkaOutboxLockManager;
 	@SpyBean
 	private ConstituencyRepository constituencyRepository;
 	@SpyBean
 	private KafkaOutboxRepository kafkaOutboxRepository;
 	@SpyBean
 	private KafkaClient kafkaClient;
-	@SpyBean
-	private IntegrationManager integrationManager;
-	@SpyBean
-	private KafkaConfiguration kafkaConfiguration;
 
-	@BeforeAll
-  void setup() {
-		Mockito.doAnswer((invocation)-> CompletableFuture.completedFuture(null))
-				.when(kafkaClient).send(Mockito.any());
-	}
 
 
 	@Test
@@ -71,6 +61,9 @@ class ConstituencyServiceTest extends PersistenceTestContext {
 	void when_kafkaSuccess_saveConstituency_bestEffort_succesful(){
 
 		// given
+		// mock kafka client to return a completed future
+		Mockito.doReturn(CompletableFuture.completedFuture(null))
+				.when(kafkaClient).send(Mockito.any());
 
 		// when
 		this.service.saveConstituency(TestUtil.createTelecom());
@@ -116,6 +109,9 @@ class ConstituencyServiceTest extends PersistenceTestContext {
 		// given
 		Mockito.doThrow(new RuntimeException("JPA is down"))
 				.when(this.constituencyRepository).save(Mockito.any());
+		// mock kafka client to return a completed future
+		Mockito.doReturn(CompletableFuture.completedFuture(null))
+				.when(kafkaClient).send(Mockito.any());
 
 		// when
 		Executable executable = () -> this.service.saveConstituency(TestUtil.createTelecom());
@@ -130,11 +126,12 @@ class ConstituencyServiceTest extends PersistenceTestContext {
 		Assertions.assertFalse(this.constituencyRepository.findAll().iterator().hasNext());
 	}
 
-	@AfterEach
+	@BeforeEach
 	void clean(TestInfo info) {
 		if(!info.getTags().contains("clean")) {
 			return;
 		}
+		this.kafkaOutboxLockManager.releaseAllLocks();
 		EntityManager em = entityManagerFactory.createEntityManager();
 		em.getTransaction().begin();
 		em.createNativeQuery("truncate table constituency").executeUpdate();

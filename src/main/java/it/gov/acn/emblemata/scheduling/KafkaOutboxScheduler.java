@@ -9,6 +9,8 @@ import it.gov.acn.emblemata.repository.KafkaOutboxRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
@@ -30,6 +32,15 @@ public class KafkaOutboxScheduler {
     private final KafkaOutboxProcessor kafkaOutboxProcessor;
     private final KafkaOutboxStatistics kafkaOutboxStatistics;
 
+    private OutboxItemSelectionStrategy outboxItemSelectionStrategy;
+
+    @PostConstruct
+    public void init(){
+        // here one should look at the configuration to decide which strategy to use
+        // for now only the exponential backoff strategy as been implemented
+        this.outboxItemSelectionStrategy = new ExponentialBackoffStrategy(this.configuration.getBackoffBase());
+    }
+
     @Transactional
     @Scheduled(fixedDelayString = "${spring.kafka.outbox.scheduler.delayms}", initialDelayString = "${spring.kafka.outbox.scheduler.delayms}")
     @SchedulerLock(name = "kafkaOutbox")
@@ -41,10 +52,12 @@ public class KafkaOutboxScheduler {
         // we have to take into account the initial attempt
         int maxAttempts  = this.configuration.getMaxAttempts()+(this.configuration.isInitialAttempt()?1:0);
 
-        // load all outstanding events
+        // load all outstanding events on a simple basis: when they have no completion date and are below the max attempts
         List<KafkaOutbox> outstandingEvents = this.kafkaOutboxRepository.findOutstandingEvents(maxAttempts, sort);
 
-        outstandingEvents = this.filterOutboxItems(outstandingEvents,this.configuration.getMaxAttempts(),this.configuration.getBackoffBase());
+        // select the outbox items to process in a more fine grained way, i.e. exponential backoff
+        // in fact, exp backoff is the only strategy implemented so far, but others could be added
+        outstandingEvents = this.outboxItemSelectionStrategy.execute(outstandingEvents);
 
         if(outstandingEvents.isEmpty()){
             logger.trace("No Kafka outbox items to process. See you later!");
@@ -63,37 +76,6 @@ public class KafkaOutboxScheduler {
         logger
             .atLevel(this.configuration.getStatisticsLogLevel())
             .log(this.kafkaOutboxStatistics.toString());
-    }
-
-    /**
-      * Filter out outbox items that have not yet completed the exponential backoff period or have exceeded the maximum number of attempts
-      * If an outbox item has not yet been attempted, it is considered for processing blindly
-      * @param outstandingEvents list of outbox items to filter
-      * @param maxAttempts maximum number of attempts
-      * @param backoffBase base of the exponential backoff
-     *                    @return filtered list of outbox items
-     */
-    // it's public for testing purposes
-    public List<KafkaOutbox> filterOutboxItems(List<KafkaOutbox> outstandingEvents, int maxAttempts, int backoffBase) {
-        if(outstandingEvents==null || outstandingEvents.isEmpty()){
-            return outstandingEvents;
-        }
-        Instant now = Instant.now();
-        return outstandingEvents.stream().filter(oe->{
-            if(oe.getTotalAttempts()==0 ||  oe.getLastAttemptDate()==null){
-                return true;
-            }
-            if(oe.getTotalAttempts()>maxAttempts){
-                return false;
-            }
-            // accepting only outbox for which the current backoff period has expired
-            // the backoff period is calculated as base^attempts
-            Instant backoffProjection = oe.getLastAttemptDate()
-                    .plus(Duration.ofMinutes((long) Math.pow(backoffBase, oe.getTotalAttempts())));
-
-            // if the projection is before now, it's time to retry, i.e. the backoff period has expired
-            return backoffProjection.isBefore(now);
-        }).toList();
     }
 
 }
