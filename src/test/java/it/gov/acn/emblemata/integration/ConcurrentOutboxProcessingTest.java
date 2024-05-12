@@ -19,13 +19,10 @@ import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -130,7 +127,7 @@ public class ConcurrentOutboxProcessingTest extends PostgresTestContext {
       criticalSectionEntrances.getAndIncrement();
       Thread.sleep(workMs);
       return new ArrayList<>();
-    }).when(kafkaOutboxRepository).findOutstandingEvents(Mockito.anyInt(), Mockito.any());
+    }).when(kafkaOutboxRepository).findOutstandingItems(Mockito.anyInt(), Mockito.any());
 
     // here we arbitrarily invoke 2 scheduler  in parallel
 
@@ -168,7 +165,7 @@ public class ConcurrentOutboxProcessingTest extends PostgresTestContext {
       criticalSectionEntrances.getAndIncrement();
       Thread.sleep(workMs);
       return new ArrayList<>();
-    }).when(kafkaOutboxRepository).findOutstandingEvents(Mockito.anyInt(), Mockito.any());
+    }).when(kafkaOutboxRepository).findOutstandingItems(Mockito.anyInt(), Mockito.any());
 
     Mockito.doAnswer(invocation -> {
       criticalSectionEntrances.getAndIncrement();

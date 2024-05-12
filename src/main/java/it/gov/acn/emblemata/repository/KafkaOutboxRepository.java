@@ -21,5 +21,5 @@ public interface KafkaOutboxRepository extends CrudRepository<KafkaOutbox, UUID>
     @Query("select k from KafkaOutbox k"
             + " where k.completionDate is null"
             + " and (?1 is null or k.totalAttempts < ?1)")
-    List<KafkaOutbox> findOutstandingEvents(Integer totalAttemptsLessThan, Sort sort);
+    List<KafkaOutbox> findOutstandingItems(Integer totalAttemptsLessThan, Sort sort);
 }

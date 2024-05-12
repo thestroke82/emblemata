@@ -5,8 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import it.gov.acn.emblemata.PostgresTestContext;
 import it.gov.acn.emblemata.model.KafkaOutbox;
 import it.gov.acn.emblemata.repository.KafkaOutboxRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -34,7 +33,7 @@ public class KafkaOutboxRepositoryTest extends PostgresTestContext {
   @Test
   @Tag("clean")
   void given_no_events_findOutstandingEvents_empty_result() {
-    List<KafkaOutbox> result = kafkaOutboxRepository.findOutstandingEvents(1, Sort.unsorted());
+    List<KafkaOutbox> result = kafkaOutboxRepository.findOutstandingItems(1, Sort.unsorted());
 
     assertThat(result).isEmpty();
   }
@@ -61,7 +60,7 @@ public class KafkaOutboxRepositoryTest extends PostgresTestContext {
     this.kafkaOutboxRepository.save(kafkaOutbox);
     this.kafkaOutboxRepository.save(kafkaOutbox1);
 
-    List<KafkaOutbox> result = kafkaOutboxRepository.findOutstandingEvents(1, Sort.unsorted());
+    List<KafkaOutbox> result = kafkaOutboxRepository.findOutstandingItems(1, Sort.unsorted());
 
     assertThat(result).isNotEmpty();
   }
@@ -82,7 +81,7 @@ public class KafkaOutboxRepositoryTest extends PostgresTestContext {
       this.kafkaOutboxRepository.save(kafkaOutbox);
     }
 
-    List<KafkaOutbox> result = kafkaOutboxRepository.findOutstandingEvents(5, Sort.unsorted());
+    List<KafkaOutbox> result = kafkaOutboxRepository.findOutstandingItems(5, Sort.unsorted());
 
     assertEquals(5, result.size());
     assertThat(result).allMatch(kafkaOutbox -> kafkaOutbox.getTotalAttempts() < 5);
@@ -110,7 +109,7 @@ public class KafkaOutboxRepositoryTest extends PostgresTestContext {
     this.kafkaOutboxRepository.save(kafkaOutbox);
     this.kafkaOutboxRepository.save(kafkaOutbox1);
 
-    List<KafkaOutbox> result = kafkaOutboxRepository.findOutstandingEvents(null, Sort.by("publishDate").ascending());
+    List<KafkaOutbox> result = kafkaOutboxRepository.findOutstandingItems(null, Sort.by("publishDate").ascending());
 
     assertThat(result).isSortedAccordingTo((a, b) -> {
       if(a.getPublishDate().toEpochMilli()== b.getPublishDate().toEpochMilli()){
