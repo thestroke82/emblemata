@@ -37,8 +37,7 @@ public class KafkaOutboxProcessor {
       BaseEvent<?> event = (BaseEvent<?>) Commons.gson.fromJson(outbox.getEvent(),  Class.forName(outbox.getEventClass()));
       this.kafkaClient.send(event).get();
     } catch (Exception e) {
-      logger.error("Error processing outbox {}",outbox.getId());
-      logger.error("Exception: ", e);
+      logger.error("Error processing outbox {}: Exception: {}", outbox.getId(), e);
       errorMessage = e.getMessage();
     }
 

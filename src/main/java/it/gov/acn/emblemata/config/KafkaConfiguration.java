@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 @ConditionalOnProperty( name = "spring.kafka.enabled", havingValue = "true" )
 public class KafkaConfiguration {
-  @Value("${spring.kafka.topic-constituency}")
+  @Value("${spring.kafka.constituency-topic}")
   private String topicConstituency;
   @Value("${spring.kafka.initial-attempt}")
   private boolean initialAttempt;

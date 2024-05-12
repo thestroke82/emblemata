@@ -29,7 +29,7 @@ public class KafkaClient {
   public CompletableFuture<SendResult<String,Object>> send(BaseEvent<?> event){
     if(!this.integrationManager.isKafkaEnabled()){
       this.gracefullyFallBack(" Send event to Kafka ");
-      return null;
+      return CompletableFuture.completedFuture(null);
     }
     return this.kafkaTemplate.send(this.config.getTopicConstituency(), event.getEventId(), event);
   }
