@@ -30,6 +30,7 @@ public class KafkaOutboxProcessor {
   private final KafkaOutboxStatistics kafkaOutboxStatistics;
 
 
+  @Transactional
   public void processOutbox(KafkaOutbox outbox){
     String errorMessage = null;
     try {

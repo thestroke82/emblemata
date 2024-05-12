@@ -96,6 +96,11 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>kafka</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<artifactId>junit-jupiter</artifactId>
 			<groupId>org.testcontainers</groupId>
 			<scope>test</scope>

@@ -23,10 +23,10 @@ public class KafkaClient {
   private IntegrationManager integrationManager;
 
   @Autowired
-  private KafkaTemplate<String, BaseEvent<?>> kafkaTemplate;
+  private KafkaTemplate<String, Object> kafkaTemplate;
 
 
-  public CompletableFuture<SendResult<String, BaseEvent<?>>> send(BaseEvent<?> event){
+  public CompletableFuture<SendResult<String,Object>> send(BaseEvent<?> event){
     if(!this.integrationManager.isKafkaEnabled()){
       this.gracefullyFallBack(" Send event to Kafka ");
       return null;

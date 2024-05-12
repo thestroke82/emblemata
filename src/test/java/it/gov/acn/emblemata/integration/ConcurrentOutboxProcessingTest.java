@@ -1,25 +1,29 @@
 package it.gov.acn.emblemata.integration;
 
-import it.gov.acn.emblemata.PersistenceTestContext;
+import it.gov.acn.emblemata.KafkaTestConfiguration;
+import it.gov.acn.emblemata.PostgresTestContext;
 import it.gov.acn.emblemata.TestUtil;
 import it.gov.acn.emblemata.config.KafkaOutboxSchedulerConfiguration;
 import it.gov.acn.emblemata.integration.kafka.KafkaClient;
 import it.gov.acn.emblemata.integration.kafka.KafkaOutboxProcessor;
 import it.gov.acn.emblemata.integration.kafka.KafkaOutboxStatistics;
 import it.gov.acn.emblemata.listener.KafkaApplicationEventListener;
-import it.gov.acn.emblemata.model.KafkaOutbox;
+import it.gov.acn.emblemata.locking.KafkaOutboxLockManager;
 import it.gov.acn.emblemata.model.event.ConstituencyCreatedEvent;
+import it.gov.acn.emblemata.repository.ConstituencyRepository;
 import it.gov.acn.emblemata.repository.KafkaOutboxRepository;
 import it.gov.acn.emblemata.scheduling.KafkaOutboxScheduler;
 import it.gov.acn.emblemata.service.KafkaOutboxService;
-import java.time.Instant;
+
 import java.util.ArrayList;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,18 +32,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
-import org.springframework.core.task.AsyncTaskExecutor;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.context.annotation.Import;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(properties = {
-    "spring.kafka.enabled=true",
-    "spring.kafka.initial-attempt=true",
-    "spring.kafka.outbox.scheduler.enabled=true",
-    "spring.kafka.admin.fail-fast: true"
+        "spring.kafka.enabled=true",
+        "spring.kafka.initial-attempt=true",
+        "spring.kafka.outbox.scheduler.enabled=true",
+        "spring.kafka.admin.fail-fast: true"
 })
 @ExtendWith(MockitoExtension.class)
-@TestInstance(Lifecycle.PER_CLASS)
-public class ConcurrentOutboxProcessingTest extends PersistenceTestContext{
+@Import(KafkaTestConfiguration.class) // used for kafka integration with testcontainers
+public class ConcurrentOutboxProcessingTest extends PostgresTestContext {
 
   @SpyBean
   private KafkaOutboxService kafkaOutboxService;
@@ -62,27 +66,26 @@ public class ConcurrentOutboxProcessingTest extends PersistenceTestContext{
   private KafkaOutboxStatistics kafkaOutboxStatistics;
 
   @Autowired
+  private ConstituencyRepository constituencyRepository;
+  @Autowired
+  private KafkaOutboxLockManager kafkaOutboxLockManager;
+
+  @Autowired
   private KafkaOutboxScheduler kafkaOutboxScheduler;
 
 
 
-
-  @BeforeAll
-  void setup() {
-    Mockito.doReturn(CompletableFuture.completedFuture(null))
-          .when(kafkaClient).send(Mockito.any());
-  }
-
   @Test
+  @Tag("clean")
   void when_concurrent_processOutbox_invocations_then_only_one_enters_critical_section()
-      throws InterruptedException {
+          throws InterruptedException {
 
     ConstituencyCreatedEvent event1 = ConstituencyCreatedEvent.builder()
-        .payload(TestUtil.createTelecom())
-        .build();
+            .payload(TestUtil.createTelecom())
+            .build();
     ConstituencyCreatedEvent event2 = ConstituencyCreatedEvent.builder()
-        .payload(TestUtil.createTelecom())
-        .build();
+            .payload(TestUtil.createTelecom())
+            .build();
 
     AtomicInteger criticalSectionEntrances = new AtomicInteger();
     int workMs = 1000;
@@ -114,8 +117,9 @@ public class ConcurrentOutboxProcessingTest extends PersistenceTestContext{
   }
 
   @Test
+  @Tag("clean")
   void when_concurrent_schedulers_then_only_one_enters_critical_section()
-      throws InterruptedException {
+          throws InterruptedException {
 
 
     AtomicInteger criticalSectionEntrances = new AtomicInteger();
@@ -148,12 +152,13 @@ public class ConcurrentOutboxProcessingTest extends PersistenceTestContext{
   }
 
   @Test
+  @Tag("clean")
   void when_concurrent_schedulers_and_processOutbox_then_only_one_enters_critical_section()
-      throws InterruptedException {
+          throws InterruptedException {
 
     ConstituencyCreatedEvent event1 = ConstituencyCreatedEvent.builder()
-        .payload(TestUtil.createTelecom())
-        .build();
+            .payload(TestUtil.createTelecom())
+            .build();
 
     AtomicInteger criticalSectionEntrances = new AtomicInteger();
     int workMs = 1000;
@@ -187,6 +192,17 @@ public class ConcurrentOutboxProcessingTest extends PersistenceTestContext{
 
     // wait for all the thread to complete e release the lock
     CompletableFuture.allOf(cf1, cf2).join();
+  }
+
+  @BeforeEach
+  @Transactional
+  void clean(TestInfo info) {
+    if(!info.getTags().contains("clean")) {
+      return;
+    }
+    this.kafkaOutboxRepository.deleteAll();
+    this.constituencyRepository.deleteAll();
+    this.kafkaOutboxLockManager.releaseAllLocks();
   }
 
 }

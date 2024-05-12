@@ -1,15 +1,17 @@
 package it.gov.acn.emblemata.integration;
 
-import it.gov.acn.emblemata.PersistenceTestContext;
+import it.gov.acn.emblemata.KafkaTestConfiguration;
+import it.gov.acn.emblemata.PostgresTestContext;
 import it.gov.acn.emblemata.TestUtil;
 import it.gov.acn.emblemata.config.KafkaOutboxSchedulerConfiguration;
 import it.gov.acn.emblemata.integration.kafka.KafkaClient;
 import it.gov.acn.emblemata.integration.kafka.KafkaOutboxStatistics;
+import it.gov.acn.emblemata.locking.KafkaOutboxLockManager;
 import it.gov.acn.emblemata.model.Constituency;
 import it.gov.acn.emblemata.model.KafkaOutbox;
+import it.gov.acn.emblemata.repository.ConstituencyRepository;
 import it.gov.acn.emblemata.repository.KafkaOutboxRepository;
 import it.gov.acn.emblemata.service.ConstituencyService;
-import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -28,22 +30,22 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(properties = {
-    "spring.kafka.enabled=true",
-    "spring.kafka.initial-attempt=true",
-    "spring.kafka.outbox.scheduler.enabled=true",
-    "spring.kafka.outbox.scheduler.max-attempts=3",
-    "spring.kafka.outbox.scheduler.delay-ms=5000",
-    "spring.kafka.outbox.scheduler.backoff-base=2",
-    "spring.kafka.outbox.statistics.log-interval-minutes=1"
+        "spring.kafka.enabled=true",
+        "spring.kafka.initial-attempt=true",
+        "spring.kafka.outbox.scheduler.enabled=true",
+        "spring.kafka.outbox.scheduler.max-attempts=3",
+        "spring.kafka.outbox.scheduler.delay-ms=5000",
+        "spring.kafka.outbox.scheduler.backoff-base=2",
+        "spring.kafka.outbox.statistics.log-interval-minutes=1"
 })
 @ExtendWith(MockitoExtension.class)
-@TestInstance(Lifecycle.PER_CLASS)
-public class KafkaOutboxSchedulerTests extends PersistenceTestContext {
+@Import(KafkaTestConfiguration.class) // used for kafka integration with testcontainers
+public class KafkaOutboxSchedulerTests extends PostgresTestContext {
 
-  @Autowired
-  private EntityManagerFactory entityManagerFactory;
 
   @SpyBean
   private KafkaOutboxSchedulerConfiguration kafkaOutboxSchedulerConfiguration;
@@ -56,19 +58,13 @@ public class KafkaOutboxSchedulerTests extends PersistenceTestContext {
 
   @SpyBean
   private KafkaClient kafkaClient;
-  @Autowired
-  private Flyway flyway;
 
   @Autowired
   private KafkaOutboxStatistics  kafkaOutboxStatistics;
-
-
-
-  @BeforeAll
-  void setup() {
-    Mockito.doAnswer((invocation)-> CompletableFuture.completedFuture(null))
-        .when(kafkaClient).send(Mockito.any());
-  }
+  @Autowired
+  private ConstituencyRepository constituencyRepository;
+  @Autowired
+  private KafkaOutboxLockManager kafkaOutboxLockManager;
 
 
 
@@ -94,22 +90,22 @@ public class KafkaOutboxSchedulerTests extends PersistenceTestContext {
 
     KafkaOutbox kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
     Assertions.assertNull(
-        kafkaOutbox.getCompletionDate());
+            kafkaOutbox.getCompletionDate());
     Assertions.assertEquals(1, kafkaOutbox.getTotalAttempts());
     Assertions.assertNotNull(kafkaOutbox.getLastError());
 
     Mockito.doReturn(CompletableFuture.completedFuture(null))
-        .when(kafkaClient).send(Mockito.any());
+            .when(kafkaClient).send(Mockito.any());
 
     // I have to wait out the backoff period
     Thread.sleep(500+this.kafkaOutboxSchedulerConfiguration.getDelayMs()
-        +this.calculateBackoff(kafkaOutbox).toMillis());
+            +this.calculateBackoff(kafkaOutbox).toMillis());
 
     Mockito.verify(kafkaClient, Mockito.times(2)).send(Mockito.any());
 
     kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
     Assertions.assertNotNull(
-        kafkaOutbox.getCompletionDate());
+            kafkaOutbox.getCompletionDate());
     Assertions.assertEquals(2, kafkaOutbox.getTotalAttempts());
     Assertions.assertNotNull(kafkaOutbox.getLastError());
   }
@@ -136,7 +132,7 @@ public class KafkaOutboxSchedulerTests extends PersistenceTestContext {
     Mockito.verify(kafkaClient, Mockito.times(1)).send(Mockito.any());
     KafkaOutbox kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
     Assertions.assertNull(
-        kafkaOutbox.getCompletionDate());
+            kafkaOutbox.getCompletionDate());
     Assertions.assertEquals(1, kafkaOutbox.getTotalAttempts());
     Assertions.assertEquals("Test exception 1", kafkaOutbox.getLastError());
 
@@ -146,20 +142,20 @@ public class KafkaOutboxSchedulerTests extends PersistenceTestContext {
     Thread.sleep(this.kafkaOutboxSchedulerConfiguration.getDelayMs()+this.calculateBackoff(kafkaOutbox).toMillis());
     kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
     Assertions.assertNull(
-        kafkaOutbox.getCompletionDate());
+            kafkaOutbox.getCompletionDate());
     Assertions.assertEquals(2, kafkaOutbox.getTotalAttempts());
     Assertions.assertEquals("Test exception 2", kafkaOutbox.getLastError());
 
 
     // next time it will succeed
     Mockito.doReturn(CompletableFuture.completedFuture(null))
-        .when(kafkaClient).send(Mockito.any());
+            .when(kafkaClient).send(Mockito.any());
 
     // wait for the scheduler to succeed the third time
     Thread.sleep(this.kafkaOutboxSchedulerConfiguration.getDelayMs()+this.calculateBackoff(kafkaOutbox).toMillis());
     kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
     Assertions.assertNotNull(
-        kafkaOutbox.getCompletionDate());
+            kafkaOutbox.getCompletionDate());
     Assertions.assertEquals(3, kafkaOutbox.getTotalAttempts());
     Assertions.assertEquals("Test exception 2", kafkaOutbox.getLastError());
 
@@ -169,21 +165,19 @@ public class KafkaOutboxSchedulerTests extends PersistenceTestContext {
 
   private Duration calculateBackoff(KafkaOutbox kafkaOutbox) {
     return Duration.ofMinutes((long)
-        Math.pow(this.kafkaOutboxSchedulerConfiguration.getBackoffBase(), kafkaOutbox.getTotalAttempts()));
+            Math.pow(this.kafkaOutboxSchedulerConfiguration.getBackoffBase(), kafkaOutbox.getTotalAttempts()));
   }
 
 
   @BeforeEach
+  @Transactional
   void clean(TestInfo info) {
     if(!info.getTags().contains("clean")) {
       return;
     }
-    EntityManager em = entityManagerFactory.createEntityManager();
-    em.getTransaction().begin();
-    em.createNativeQuery("truncate table constituency").executeUpdate();
-    em.createNativeQuery("truncate table kafka_outbox").executeUpdate();
-    em.getTransaction().commit();
-
+    this.kafkaOutboxRepository.deleteAll();
+    this.constituencyRepository.deleteAll();
+    this.kafkaOutboxLockManager.releaseAllLocks();
     this.kafkaOutboxStatistics.reset();
   }
 
