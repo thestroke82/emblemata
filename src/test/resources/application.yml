@@ -41,7 +41,7 @@ spring:
         max.in.flight.requests.per.connection: 1
 
     # application specific kafka related configuration
-    constituency-topic-: emblemata-constituency
+    constituency-topic: emblemata-constituency
     initial-attempt: true   # if true a first best effort attempt is made to send the message to kafka after storing it in the outbox
 
     # the outbox pattern is used to store messages in the database before sending them to kafka

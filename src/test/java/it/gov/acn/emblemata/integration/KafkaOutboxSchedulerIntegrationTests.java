@@ -12,18 +12,13 @@ import it.gov.acn.emblemata.model.KafkaOutbox;
 import it.gov.acn.emblemata.repository.ConstituencyRepository;
 import it.gov.acn.emblemata.repository.KafkaOutboxRepository;
 import it.gov.acn.emblemata.service.ConstituencyService;
-import jakarta.persistence.EntityManagerFactory;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
-import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -45,7 +40,7 @@ import org.testcontainers.shaded.org.awaitility.Awaitility;
 })
 @ExtendWith(MockitoExtension.class)
 @Import(KafkaTestConfiguration.class) // used for kafka integration with testcontainers
-public class KafkaOutboxSchedulerTests extends PostgresTestContext {
+public class KafkaOutboxSchedulerIntegrationTests extends PostgresTestContext {
 
 
   @SpyBean
