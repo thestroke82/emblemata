@@ -32,6 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @SpringBootTest(properties = {
         "spring.kafka.enabled=true",
@@ -66,43 +67,51 @@ public class KafkaOutboxSchedulerTests extends PostgresTestContext {
   @Autowired
   private KafkaOutboxLockManager kafkaOutboxLockManager;
 
-
-
   @Test
   @Tag("clean")
-  void when_saveConstituency_bestEffort_attempt_fails_then_scheduler_succeed() throws InterruptedException {
+  void when_saveConstituency_bestEffort_attempt_fails_then_scheduler_succeeds() throws InterruptedException {
+    // This test takes approximately 2 minutes to run
 
-    // given:
+    // Given: Create a new constituency
     Constituency enel = TestUtil.createEnel();
 
-    // I want the actual Kafka call to fail the first time
+    // Mock the Kafka client to throw an exception when sending a message
     Mockito.doThrow(new RuntimeException("Test exception")).when(kafkaClient).send(Mockito.any());
 
-    // when
-    // base case: a new constituency is saved and an initial unsuccesful attempt is made
+    // When: Save the constituency, which triggers a Kafka message send attempt that fails
     this.constituencyService.saveConstituency(enel);
 
-    // then:
-    // wait for the scheduler to process the outbox and verify that's not been called a second time
-    Thread.sleep(200);
+    // Then: Verify that the Kafka client's send method was called once
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() ->
+            Mockito.verify(kafkaClient, Mockito.times(1)).send(Mockito.any())
+        );
 
-    Mockito.verify(kafkaClient, Mockito.times(1)).send(Mockito.any());
-
+    // Check the state of the Kafka outbox after the failed send attempt
     KafkaOutbox kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
     Assertions.assertNull(
             kafkaOutbox.getCompletionDate());
     Assertions.assertEquals(1, kafkaOutbox.getTotalAttempts());
     Assertions.assertNotNull(kafkaOutbox.getLastError());
 
+    // Mock the Kafka client to succeed when sending a message
     Mockito.doReturn(CompletableFuture.completedFuture(null))
             .when(kafkaClient).send(Mockito.any());
 
-    // I have to wait out the backoff period
-    Thread.sleep(500+this.kafkaOutboxSchedulerConfiguration.getDelayMs()
-            +this.calculateBackoff(kafkaOutbox).toMillis());
+    // Wait for the scheduler to retry the message send
+    Awaitility
+        .await()
+        .atMost(Duration.ofMillis(
+            500+this.kafkaOutboxSchedulerConfiguration.getDelayMs()+this.calculateBackoff(kafkaOutbox).toMillis()
+            )
+        )
+        .untilAsserted(() ->
+            Mockito.verify(kafkaClient, Mockito.times(2)).send(Mockito.any())
+        );
 
-    Mockito.verify(kafkaClient, Mockito.times(2)).send(Mockito.any());
 
+    // Check the state of the Kafka outbox after the successful send attempt
     kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
     Assertions.assertNotNull(
             kafkaOutbox.getCompletionDate());
@@ -112,34 +121,48 @@ public class KafkaOutboxSchedulerTests extends PostgresTestContext {
 
   @Test
   @Tag("clean")
-  void given_initialAttemmpt_disabled_when_saveConstituency_then_scheduler_success_3rd_time() throws InterruptedException {
+  void given_initialAttempt_disabled_when_saveConstituency_then_scheduler_succeeds_on_third_attempt() throws InterruptedException {
+    // This test takes approximately 6 minutes to run
 
-    // given:
+    // Given: Create a new constituency
     Constituency enel = TestUtil.createEnel();
-    // the kafka send will fail twice
+
+    // Mock the Kafka client to throw an exception when sending a message
     Mockito.doThrow(new RuntimeException("Test exception 1")).when(kafkaClient).send(Mockito.any());
-    // disable first best effort attempt
+
+    // Disable the initial attempt configuration
     Mockito.when(kafkaOutboxSchedulerConfiguration.isInitialAttempt()).thenReturn(false);
 
-    // when
+    // When
     this.constituencyService.saveConstituency(enel);
 
+    // Then: Wait for the scheduler to fail the first time
+    Awaitility
+        .await()
+        .atMost(Duration.ofMillis(this.kafkaOutboxSchedulerConfiguration.getDelayMs()+100))
+        .untilAsserted(() ->
+            Mockito.verify(kafkaClient, Mockito.times(1)).send(Mockito.any())
+        );
 
-    // then
-    // wait for the scheduler to fail the first time
-    Thread.sleep(this.kafkaOutboxSchedulerConfiguration.getDelayMs()+100);
-
-    Mockito.verify(kafkaClient, Mockito.times(1)).send(Mockito.any());
+    // Check the state of the Kafka outbox after the first failed send attempt
     KafkaOutbox kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
     Assertions.assertNull(
             kafkaOutbox.getCompletionDate());
     Assertions.assertEquals(1, kafkaOutbox.getTotalAttempts());
     Assertions.assertEquals("Test exception 1", kafkaOutbox.getLastError());
 
+    // Mock the Kafka client to throw an exception when sending a message the second time
     Mockito.doThrow(new RuntimeException("Test exception 2")).when(kafkaClient).send(Mockito.any());
 
-    // wait for the scheduler to fail the second time
-    Thread.sleep(this.kafkaOutboxSchedulerConfiguration.getDelayMs()+this.calculateBackoff(kafkaOutbox).toMillis());
+    // Wait for the scheduler to fail the second time
+    Awaitility
+        .await()
+        .atMost(Duration.ofMillis(this.kafkaOutboxSchedulerConfiguration.getDelayMs()+this.calculateBackoff(kafkaOutbox).toMillis()))
+        .untilAsserted(() ->
+            Mockito.verify(kafkaClient, Mockito.times(2)).send(Mockito.any())
+        );
+
+    // Check the state of the Kafka outbox after the second failed send attempt
     kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
     Assertions.assertNull(
             kafkaOutbox.getCompletionDate());
@@ -147,18 +170,26 @@ public class KafkaOutboxSchedulerTests extends PostgresTestContext {
     Assertions.assertEquals("Test exception 2", kafkaOutbox.getLastError());
 
 
-    // next time it will succeed
+    // Mock the Kafka client to succeed this time
     Mockito.doReturn(CompletableFuture.completedFuture(null))
             .when(kafkaClient).send(Mockito.any());
 
-    // wait for the scheduler to succeed the third time
-    Thread.sleep(this.kafkaOutboxSchedulerConfiguration.getDelayMs()+this.calculateBackoff(kafkaOutbox).toMillis());
+    // Wait for the scheduler to succeed the third time
+    Awaitility
+        .await()
+        .atMost(Duration.ofMillis(this.kafkaOutboxSchedulerConfiguration.getDelayMs()+this.calculateBackoff(kafkaOutbox).toMillis()))
+        .untilAsserted(() ->
+            Mockito.verify(kafkaClient, Mockito.times(3)).send(Mockito.any())
+        );
+
+    // Check the state of the Kafka outbox after the successful send attempt
     kafkaOutbox = this.kafkaOutboxRepository.findAll().iterator().next();
     Assertions.assertNotNull(
             kafkaOutbox.getCompletionDate());
     Assertions.assertEquals(3, kafkaOutbox.getTotalAttempts());
     Assertions.assertEquals("Test exception 2", kafkaOutbox.getLastError());
 
+    // Verify the statistics of the Kafka outbox
     Assertions.assertEquals(1, this.kafkaOutboxStatistics.getSucceeded());
     Assertions.assertEquals(1, this.kafkaOutboxStatistics.getQueued());
   }
