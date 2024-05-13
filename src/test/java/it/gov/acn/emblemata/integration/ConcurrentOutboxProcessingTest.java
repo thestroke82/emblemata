@@ -138,12 +138,11 @@ public class ConcurrentOutboxProcessingTest extends PostgresTestContext {
       return null;
     });
 
-    Thread.sleep(workMs/2);
+
+    // wait for all the thread to complete
+    CompletableFuture.allOf(cf1, cf2).join();
 
     Assertions.assertEquals(1, criticalSectionEntrances.get() );
-
-    // wait for all the thread to complete e release the lock
-    CompletableFuture.allOf(cf1, cf2).join();
   }
 
   @Test
@@ -181,12 +180,10 @@ public class ConcurrentOutboxProcessingTest extends PostgresTestContext {
       return null;
     });
 
-    Thread.sleep(workMs/2);
+    // wait for all the thread to complete
+    CompletableFuture.allOf(cf1, cf2).join();
 
     Assertions.assertEquals(1, criticalSectionEntrances.get() );
-
-    // wait for all the thread to complete e release the lock
-    CompletableFuture.allOf(cf1, cf2).join();
   }
 
   @BeforeEach
