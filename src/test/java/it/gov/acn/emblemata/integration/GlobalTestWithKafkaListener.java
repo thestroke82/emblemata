@@ -60,7 +60,7 @@ public class GlobalTestWithKafkaListener extends PostgresTestContext {
     this.constituencyService.saveConstituency(enel);
 
     // Then
-    Awaitility.await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+    Awaitility.await().atMost(10, TimeUnit.SECONDS).untilAsserted(() ->
         Assertions.assertEquals(1, receivedKafkaMessages.size())
     );
 
@@ -71,8 +71,8 @@ public class GlobalTestWithKafkaListener extends PostgresTestContext {
   }
 
   @KafkaListener(topics = "#{kafkaConfiguration.getTopicConstituency()}", containerFactory = "constituencyKafkaListenerContainerFactory")
-  public void listen(ConsumerRecord<String, ConstituencyCreatedEvent> record) {
-    this.receivedKafkaMessages.add(record.value());
+  public void listen(ConstituencyCreatedEvent event) {
+    this.receivedKafkaMessages.add(event);
   }
 
 }

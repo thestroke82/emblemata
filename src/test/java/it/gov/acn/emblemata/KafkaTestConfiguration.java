@@ -17,8 +17,11 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.util.backoff.BackOff;
+import org.springframework.util.backoff.FixedBackOff;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -29,7 +32,7 @@ import java.util.Map;
 @ActiveProfiles("test")
 public class KafkaTestConfiguration {
 
-public static final String CONSUMER_GROUP_ID = "test-group";
+    public static final String CONSUMER_GROUP_ID = "test-group";
 
     @Bean
     public KafkaContainer kafkaContainer() {
@@ -62,13 +65,23 @@ public static final String CONSUMER_GROUP_ID = "test-group";
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaContainer().getBootstrapServers());
         props.put(ConsumerConfig.GROUP_ID_CONFIG, CONSUMER_GROUP_ID);
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);;
         return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), new JsonDeserializer<>(ConstituencyCreatedEvent.class));
+    }
+    @Bean
+    public DefaultErrorHandler errorHandler() {
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler((consumerRecord, exception) -> {
+            System.out.println("Error occurred: " + exception.getMessage());
+        });
+        return errorHandler;
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, ConstituencyCreatedEvent> constituencyKafkaListenerContainerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, ConstituencyCreatedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(constituencyConsumerFactory());
+        factory.setCommonErrorHandler(errorHandler());
         return factory;
     }
 
