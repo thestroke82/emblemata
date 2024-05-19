@@ -38,6 +38,7 @@ spring:
         enable.idempotence: false
         delivery.timeout.ms: 1000
         request.timeout.ms: 1000
+        max.block.ms: 2000
         max.in.flight.requests.per.connection: 1
 
     # application specific kafka related configuration
@@ -62,7 +63,12 @@ spring:
 logging:
   level:
     root: WARN
-    it.gov.acn: DEBUG
+    it.gov.acn: TRACE
+    org:
+      apache:
+        kafka:
+          clients:
+            NetworkClient: ERROR
     #org.springframework.kafka.core.KafkaTemplate: TRACE
     #org.apache.kafka: DEBUG
     #org.hibernate.engine.transaction.internal.TransactionImpl: TRACE
