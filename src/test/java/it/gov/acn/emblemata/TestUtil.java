@@ -5,6 +5,8 @@ import ch.qos.logback.classic.LoggerContext;
 import it.gov.acn.emblemata.model.Constituency;
 import java.time.Instant;
 import java.util.List;
+import java.util.Random;
+
 import org.slf4j.LoggerFactory;
 import org.springframework.data.util.Pair;
 
@@ -42,5 +44,12 @@ public class TestUtil {
   public static void changeLogLevels(List<Pair<String, Level>> commands){
     LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
     commands.forEach(pair -> loggerContext.getLogger(pair.getFirst()).setLevel(pair.getSecond()));
+  }
+
+  public static Pair<Integer, Integer> getRandomPorsForKafka(){
+    // returns a pair of random ports for kafka in the range 49152-65535
+    Random random = new Random();
+    return Pair.of(random.nextInt(16383)+49152, random.nextInt(16383)+49152);
+
   }
 }

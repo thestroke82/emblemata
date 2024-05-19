@@ -1,15 +1,22 @@
 package it.gov.acn.emblemata;
 
+import com.github.dockerjava.api.model.ExposedPort;
+import com.github.dockerjava.api.model.HostConfig;
+import com.github.dockerjava.api.model.PortBinding;
+import com.github.dockerjava.api.model.Ports;
 import it.gov.acn.emblemata.model.event.BaseEvent;
 import it.gov.acn.emblemata.model.event.ConstituencyCreatedEvent;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.util.Pair;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.ConsumerFactory;
@@ -26,6 +33,7 @@ import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @TestConfiguration
@@ -34,9 +42,20 @@ public class KafkaTestConfiguration {
 
     public static final String CONSUMER_GROUP_ID = "test-group";
 
+    @Autowired
+    private KafkaProperties kafkaProperties;
+
+
     @Bean
     public KafkaContainer kafkaContainer() {
-        KafkaContainer kafkaContainer = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:5.4.3"));
+        KafkaContainer kafkaContainer = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:5.4.3"))
+                .withExposedPorts(9092,9093)
+                .withReuse(true);
+        // it's good practice to bind to random ports to avoid conflicts
+        // but I want to use the same port every time I start the container
+        // there's a test that simulates the kafka broker failure and restart
+        Pair<Integer, Integer> ports = TestUtil.getRandomPorsForKafka();
+        kafkaContainer.setPortBindings( List.of(ports.getFirst()+":9092", ports.getSecond()+":9093"));
         kafkaContainer.start();
         return kafkaContainer;
     }
@@ -44,13 +63,10 @@ public class KafkaTestConfiguration {
     @Bean
     @Primary
     public ProducerFactory<String, Object> producerFactory(KafkaContainer kafkaContainer) {
-        Map<String, Object> configs = new HashMap<>();
-        configs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaContainer.getBootstrapServers());
-        configs.put(ProducerConfig.ACKS_CONFIG, "1");
-        configs.put(ProducerConfig.RETRIES_CONFIG, "0");
-        configs.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
-        configs.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "org.springframework.kafka.support.serializer.JsonSerializer");
-        return new DefaultKafkaProducerFactory<>(configs);
+        Map<String, Object> props =
+                new HashMap<>(kafkaProperties.buildProducerProperties(null));
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaContainer.getBootstrapServers());
+        return new DefaultKafkaProducerFactory<>(props);
     }
 
     @Bean
