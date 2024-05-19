@@ -15,6 +15,7 @@ import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.SimpleLock;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.support.SendResult;
@@ -38,8 +39,8 @@ public class KafkaOutboxProcessor {
       BaseEvent<?> event = (BaseEvent<?>) Commons.gson.fromJson(outbox.getEvent(),  Class.forName(outbox.getEventClass()));
       this.kafkaClient.send(event).get();
     } catch (Exception e) {
-      logger.error("Error processing outbox {}: Exception: {}", outbox.getId(), e.getMessage());
-      errorMessage = e.getMessage();
+      errorMessage = Commons.format(e);
+      logger.error("Error processing outbox {}: Exception: {}", outbox.getId(), errorMessage);
     }
 
     if(errorMessage!= null){

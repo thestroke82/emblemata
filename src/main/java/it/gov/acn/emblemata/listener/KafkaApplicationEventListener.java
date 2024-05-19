@@ -9,14 +9,21 @@ import it.gov.acn.emblemata.model.KafkaOutbox;
 import it.gov.acn.emblemata.model.event.BaseEvent;
 import it.gov.acn.emblemata.service.KafkaOutboxService;
 import lombok.RequiredArgsConstructor;
+import net.javacrumbs.shedlock.core.SimpleLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.util.Optional;
+
 @Component
 @RequiredArgsConstructor
 public class KafkaApplicationEventListener {
+
+  private final Logger logger = LoggerFactory.getLogger(KafkaApplicationEventListener.class);
   private final KafkaOutboxService kafkaOutboxService;
   private final KafkaOutboxProcessor kafkaOutboxHandler;
   private final KafkaOutboxLockManager kafkaOutboxLockManager;
@@ -33,13 +40,19 @@ public class KafkaApplicationEventListener {
     this.kafkaOutboxStatistics.incrementQueued();
     if(this.integrationManager.isKafkaEnabled() && this.kafkaConfig.isInitialAttempt()){
       // best effort initial attempt. See configuration "initial-attempt"
-      // if lock already acquired, skip processing
-      var lock = this.kafkaOutboxLockManager.lock();
-      if(lock.isEmpty()){
-        return;
+      // if the lock is already acquired by some other thread, skip processing
+      Optional<SimpleLock> lock = Optional.empty();
+      try {
+        lock = this.kafkaOutboxLockManager.lock();
+        if(lock.isEmpty()){
+          return;
+        }
+        this.kafkaOutboxHandler.processOutbox(outbox);
+      } catch (Exception e) {
+        logger.error("Error processing outbox: " + e.getMessage());
+      } finally {
+        lock.ifPresent(this.kafkaOutboxLockManager::release);
       }
-      this.kafkaOutboxHandler.processOutbox(outbox);
-      this.kafkaOutboxLockManager.release(lock.orElse(null));
     }
   }
 
