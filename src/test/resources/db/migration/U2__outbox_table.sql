@@ -1,0 +1,1 @@
+DROP TABLE transactional_outbox;

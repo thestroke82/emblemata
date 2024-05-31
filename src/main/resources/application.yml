@@ -44,18 +44,11 @@ spring:
     constituency-topic: emblemata-constituency
     initial-attempt: true   # if true a first best effort attempt is made to send the message to kafka after storing it in the outbox
 
-    # the outbox pattern is used to store messages in the database before sending them to kafka
-    outbox:
-      scheduler:
-        enabled: true
-        delayms: '#{60*1000}' #60 seconds # the interval at which the scheduler runs, expressed in milliseconds
-        max-attempts: 3 # count of retry attempts for sending a message to kafka, not including the first best effort attempt
-        backoff-base: 5 # base in minutes for the exponential backoff. Example: if backoff base is 5, the 1st retry attempt
-        # will be made after 5 minutes, the 2nd after 25 minutes, the 3rd after 125 minutes, etc.
-        statistics:
-          log: true
-          log-level: INFO
-          log-interval-minutes: 60 # print statistics every 60 minutes
+
+acn:
+  outbox:
+    scheduler:
+      enabled: true
 
 
 
