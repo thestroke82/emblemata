@@ -18,9 +18,9 @@ public class OutboxHandler implements OutboxItemHandlerProvider {
   @Override
   public void handle(OutboxItem outboxItem) {
     try {
-      BaseEvent<?> event = (BaseEvent<?>) Commons.gson.fromJson(
-          outboxItem.getEvent(),  Class.forName(
-          outboxItem.getEventType())
+      BaseEvent<?> event = (BaseEvent<?>) Commons.objectMapper.readValue(
+          outboxItem.getEvent(),
+          Class.forName(outboxItem.getEventType())
       );
       this.handle(event);
     } catch (Exception e) {
