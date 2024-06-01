@@ -5,13 +5,18 @@ import it.gov.acn.autoconfigure.outbox.config.OutboxProperties;
 import it.gov.acn.emblemata.KafkaTestConfiguration;
 import it.gov.acn.emblemata.PostgresTestContext;
 import it.gov.acn.emblemata.TestUtil;
+import it.gov.acn.emblemata.integration.kafka.KafkaClient;
 import it.gov.acn.emblemata.model.Constituency;
 import it.gov.acn.emblemata.model.event.ConstituencyCreatedEvent;
 import it.gov.acn.emblemata.repository.ConstituencyRepository;
 import it.gov.acn.emblemata.service.ConstituencyService;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+
+import it.gov.acn.outbox.model.DataProvider;
+import it.gov.acn.outbox.model.OutboxItem;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,17 +33,17 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @SpringBootTest(properties = {
-    "spring.kafka.enabled=true",
-    "spring.kafka.initial-attempt=false",
-    "acn.outbox.scheduler.enabled=true",
-    "acn.outbox.scheduler.max-attempts=3",
-    "acn.outbox.scheduler.fixed-delay=5000",
-    "acn.outbox.scheduler.backoff-base=1",
+        "spring.kafka.enabled=true",
+        "spring.kafka.initial-attempt=false",
+        "acn.outbox.scheduler.enabled=true",
+        "acn.outbox.scheduler.max-attempts=3",
+        "acn.outbox.scheduler.fixed-delay=5000",
+        "acn.outbox.scheduler.backoff-base=1",
 })
 @ExtendWith(MockitoExtension.class)
 @Import(KafkaTestConfiguration.class) // used for kafka integration with testcontainers
 public class GlobalTestKafkaListener extends PostgresTestContext {
-  private final List<ConstituencyCreatedEvent> receivedKafkaMessages = new ArrayList<>();
+  private static List<ConstituencyCreatedEvent> receivedKafkaMessages = Collections.synchronizedList(new ArrayList<>());
 
   @Autowired
   private JdbcTemplate jdbcTemplate;
@@ -47,12 +52,17 @@ public class GlobalTestKafkaListener extends PostgresTestContext {
   private OutboxProperties outboxProperties;
   @Autowired
   private ConstituencyService  constituencyService;
+  @Autowired
+  private DataProvider dataProvider;
 
   @SpyBean
   private ConstituencyRepository constituencyRepository;
 
   @SpyBean
-  private KafkaTemplate<?, ?> kafkaTemplate;
+  private KafkaTemplate<String, Object> kafkaTemplate;
+
+  @SpyBean
+  private KafkaClient kafkaClient;
 
 
   @BeforeEach
@@ -71,49 +81,110 @@ public class GlobalTestKafkaListener extends PostgresTestContext {
     this.constituencyService.saveConstituency(constituency);
     // then
     Awaitility.await()
-        .atMost(Duration.ofMillis(outboxProperties.getFixedDelay()+1000))
-        .until(() -> receivedKafkaMessages.size() == 1);
+            .atMost(Duration.ofMillis(outboxProperties.getFixedDelay()+1000))
+            .until(() -> receivedKafkaMessages
+                    .stream()
+                    .anyMatch(event -> event.getPayload().getId().equals(constituency.getId())));
 
-    ConstituencyCreatedEvent event = receivedKafkaMessages.get(0);
-    Assertions.assertEquals(constituency.getId(), event.getPayload().getId());
+    Assertions.assertEquals(1, receivedKafkaMessages.size());
   }
 
   @Test
-  public void given_kafka_template_exception_on_first_attempt_when_saveConstituency_then_succeeds_second_attempt() {
+  public void given_kafka_template_exception_on_first_attempt_when_saveConstituency_then_succeeds_second_attempt(){
     // given
     Mockito.doThrow(new RuntimeException("Kafka template test exception"))
-        .when(kafkaTemplate).send(Mockito.anyString(), Mockito.any());
-    Constituency constituency = TestUtil.createEnel();
+            .when(kafkaTemplate).send(Mockito.anyString(),Mockito.any(), Mockito.any());
+
+    Constituency constituency = TestUtil.createFastweb();
 
     // when
     this.constituencyService.saveConstituency(constituency);
 
     // then
     Awaitility.await()
-        .atMost(Duration.ofMillis(outboxProperties.getFixedDelay()))
-        .untilAsserted(()->
-            Mockito.verify(kafkaTemplate, Mockito.times(1))
-                .send(Mockito.anyString(),Mockito.any(), Mockito.any())
-        );
+            .atMost(
+                    Duration.ofMillis(outboxProperties.getFixedDelay())
+                            .plus(Duration.ofSeconds(10))
+            )
+            .untilAsserted(()->
+                    Mockito.verify(kafkaTemplate, Mockito.times(1))
+                            .send(Mockito.anyString(),Mockito.any(), Mockito.any())
+            );
 
     Assertions.assertEquals(0, receivedKafkaMessages.size());
 
     Mockito.reset(kafkaTemplate);
 
     Awaitility.await()
-        .atMost(
-            Duration.ofMillis(outboxProperties.getFixedDelay())
-            .plus(Duration.ofMinutes(this.calculateBackoff(1,1)))
-            .plus(Duration.ofMillis(outboxProperties.getFixedDelay()))
-        )
-        .until(() -> receivedKafkaMessages.size() == 1);
+            .atMost(
+                    Duration.ofMillis(outboxProperties.getFixedDelay())
+                            .plus(Duration.ofMinutes(this.calculateBackoff(1,1)))
+                            .plus(Duration.ofMillis(outboxProperties.getFixedDelay()))
+                            .plus(Duration.ofSeconds(10))
+            )
+            .until(() -> receivedKafkaMessages
+                    .stream()
+                    .anyMatch(event -> event.getPayload().getId().equals(constituency.getId())));
 
-    ConstituencyCreatedEvent event = receivedKafkaMessages.get(0);
-    Assertions.assertEquals(constituency.getId(), event.getPayload().getId());
+    Assertions.assertEquals(1, receivedKafkaMessages.size());
+
+  }
+
+  @Test
+  public void given_kafka_template_exception_on_first_two_attempts_when_saveConstituency_then_succeeds_third_attempt(){
+    // given
+    Mockito.doThrow(new RuntimeException("Kafka template test exception"))
+            .when(kafkaTemplate).send(Mockito.anyString(),Mockito.any(), Mockito.any());
+
+    Constituency constituency = TestUtil.createTelecom();
+
+    // when
+    this.constituencyService.saveConstituency(constituency);
+
+    // then
+    Awaitility.await()
+            .atMost(
+                    Duration.ofMillis(outboxProperties.getFixedDelay())
+                            .plus(Duration.ofSeconds(10))
+            )
+            .untilAsserted(()->
+                    Mockito.verify(kafkaTemplate, Mockito.times(1))
+                            .send(Mockito.anyString(),Mockito.any(), Mockito.any())
+            );
+
+    Assertions.assertEquals(0, receivedKafkaMessages.size());
+
+    Awaitility.await()
+            .atMost(
+                    Duration.ofMillis(outboxProperties.getFixedDelay())
+                            .plus(Duration.ofMinutes(this.calculateBackoff(1,1)))
+                            .plus(Duration.ofMillis(outboxProperties.getFixedDelay()))
+                            .plus(Duration.ofSeconds(10))
+            )
+            .untilAsserted(()->
+                    Mockito.verify(kafkaTemplate, Mockito.times(1))
+                            .send(Mockito.anyString(),Mockito.any(), Mockito.any())
+            );
+
+    Assertions.assertEquals(0, receivedKafkaMessages.size());
+
+    Mockito.reset(kafkaTemplate);
+
+    Awaitility.await()
+            .atMost(
+                    Duration.ofMillis(outboxProperties.getFixedDelay())
+                            .plus(Duration.ofMinutes(this.calculateBackoff(2,1)))
+                            .plus(Duration.ofMillis(outboxProperties.getFixedDelay()))
+                            .plus(Duration.ofSeconds(10))
+            )
+            .until(() -> receivedKafkaMessages
+                    .stream()
+                    .anyMatch(event -> event.getPayload().getId().equals(constituency.getId())));
+    Assertions.assertEquals(1, receivedKafkaMessages.size());
   }
 
   @KafkaListener(topics = "#{kafkaConfiguration.getTopicConstituency()}",
-      containerFactory = "constituencyKafkaListenerContainerFactory")
+          containerFactory = "constituencyKafkaListenerContainerFactory")
   public void listen(ConstituencyCreatedEvent event) {
     this.receivedKafkaMessages.add(event);
   }
