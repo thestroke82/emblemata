@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
 import it.gov.acn.emblemata.model.Constituency;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Random;
 
@@ -11,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.util.Pair;
 
 public class TestUtil {
+  private static final String[] names = {"Enel", "Fastweb", "Telecom", "Vodafone", "Wind", "TIM", "Tre", "PosteMobile", "Iliad", "CoopVoce"};
+    private static final String[] addresses = {"Via dei salici, XXX Roma(RM)", "Piazza Grande 12, 00125 Roma(RM)", "Via Ciro Gennaro, 00111 Napoli(NA)", "Via dei fiori, 00125 Roma(RM)", "Via dei pini, 00125 Roma(RM)", "Via dei cipressi, 00125 Roma(RM)", "Via dei castagni, 00125 Roma(RM)", "Via dei ciliegi, 00125 Roma(RM)", "Via dei melograni, 00125 Roma(RM)", "Via dei mandarini, 00125 Roma(RM)"};
 
   public static Constituency createEnel() {
     return Constituency.builder()
@@ -38,6 +41,15 @@ public class TestUtil {
         .name("You should not see this")
         .address("Neverland")
         .foundationDate(Instant.now())
+        .build();
+  }
+
+  public static Constituency createRandomConstituency(){
+    Random random = new Random();
+    return Constituency.builder()
+        .name(names[random.nextInt(names.length)])
+        .address(addresses[random.nextInt(addresses.length)])
+        .foundationDate(Instant.now().minus(random.nextInt(30), ChronoUnit.DAYS))
         .build();
   }
 

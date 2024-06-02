@@ -183,6 +183,26 @@ public class GlobalTestKafkaListener extends PostgresTestContext {
     Assertions.assertEquals(1, receivedKafkaMessages.size());
   }
 
+  @Test
+  public void when_save_a_lot_of_constituencies_then_should_receive_all_kafka_messages(){
+    // given
+    int load = 100;
+    List<Constituency> constituencies = new ArrayList<>();
+    for(int i = 0; i < load; i++){
+      constituencies.add(TestUtil.createRandomConstituency());
+    }
+
+    // when
+    constituencies.forEach(constituencyService::saveConstituency);
+
+    // then
+    Awaitility.await()
+            .atMost(Duration.ofMillis(outboxProperties.getFixedDelay()+2000))
+            .until(() -> receivedKafkaMessages.size() == load);
+
+    Assertions.assertEquals(load, receivedKafkaMessages.size());
+  }
+
   @KafkaListener(topics = "#{kafkaConfiguration.getTopicConstituency()}",
           containerFactory = "constituencyKafkaListenerContainerFactory")
   public void listen(ConstituencyCreatedEvent event) {
