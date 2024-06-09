@@ -5,8 +5,9 @@ import it.gov.acn.emblemata.integration.IntegrationManager;
 import it.gov.acn.emblemata.model.event.BaseEvent;
 import it.gov.acn.emblemata.outbox.OutboxHandler;
 import it.gov.acn.outbox.core.recorder.OutboxEventRecorder;
-import it.gov.acn.outbox.model.LockingProvider;
 import java.util.Optional;
+
+import it.gov.acn.outbox.provider.LockingProvider;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

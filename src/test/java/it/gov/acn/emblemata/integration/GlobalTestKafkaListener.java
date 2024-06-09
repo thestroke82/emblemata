@@ -15,8 +15,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import it.gov.acn.outbox.model.DataProvider;
-import it.gov.acn.outbox.model.OutboxItem;
+import it.gov.acn.outbox.provider.DataProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

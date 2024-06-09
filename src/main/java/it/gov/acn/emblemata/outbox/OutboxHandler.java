@@ -4,8 +4,8 @@ import it.gov.acn.emblemata.integration.kafka.KafkaClient;
 import it.gov.acn.emblemata.model.event.BaseEvent;
 import it.gov.acn.emblemata.util.Commons;
 import it.gov.acn.outbox.model.OutboxItem;
-import it.gov.acn.outbox.model.OutboxItemHandlerProvider;
-import java.util.concurrent.ExecutionException;
+
+import it.gov.acn.outbox.provider.OutboxItemHandlerProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
